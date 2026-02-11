@@ -71,8 +71,11 @@ Application.put_env(:log_stream_dashboard, Demo.Endpoint,
 # reconfigure for in-memory mode, then restart
 Application.stop(:log_stream)
 Application.put_env(:log_stream, :storage, :memory)
-Application.put_env(:log_stream, :flush_interval, 2_000)
-Application.put_env(:log_stream, :max_buffer_size, 100)
+Application.put_env(:log_stream, :flush_interval, 5_000)
+Application.put_env(:log_stream, :max_buffer_size, 500)
+Application.put_env(:log_stream, :compaction_interval, 10_000)
+Application.put_env(:log_stream, :compaction_threshold, 500)
+Application.put_env(:log_stream, :compaction_max_raw_age, 30)
 
 # Start deps
 {:ok, _} = Application.ensure_all_started(:phoenix_live_dashboard)
@@ -97,7 +100,7 @@ IO.puts("""
   http://localhost:4040/dashboard/logs
 ========================================
 
-Generating sample log entries every 2 seconds...
+Generating sample log entries every second...
 Press Ctrl+C twice to stop.
 """)
 
@@ -117,16 +120,14 @@ sample_messages = [
   {"Unhandled exception in controller", :error, %{module: "UserController", action: "show"}}
 ]
 
-Stream.interval(2_000)
+Stream.interval(500)
 |> Stream.each(fn _ ->
-  # Pick 2-4 random messages per tick
-  count = Enum.random(2..4)
+  # Pick 5-10 random messages per tick (~15-20/sec → ~500 in 30s)
+  count = Enum.random(5..10)
 
   for _ <- 1..count do
     {msg, level, meta} = Enum.random(sample_messages)
     Logger.log(level, msg, Map.to_list(meta))
   end
-
-  LogStream.flush()
 end)
 |> Stream.run()

@@ -20,32 +20,34 @@ defmodule LogStreamDashboard.Components do
 
     ~H"""
     <div class="mb-4">
-      <form phx-submit="search" class="d-flex align-items-end mb-3" style="gap: 0.75rem;">
-        <div>
-          <label class="form-label mb-1"><small>Message</small></label>
-          <input
-            type="text"
-            name="search"
-            value={@search}
-            placeholder="Search messages..."
-            class="form-control form-control-sm"
-            style="min-width: 240px;"
-          />
-        </div>
-        <div>
-          <label class="form-label mb-1"><small>Level</small></label>
-          <select name="level" class="form-select form-select-sm" style="min-width: 120px;">
-            <option value="" selected={@level == ""}>All</option>
-            <option :for={l <- @levels} value={l} selected={@level == l}>
-              {String.capitalize(l)}
-            </option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm">Search</button>
-        <button type="button" phx-click="clear" class="btn btn-outline-secondary btn-sm">
+      <div class="d-flex align-items-end mb-3" style="gap: 0.75rem;">
+        <form phx-submit="search" class="d-flex align-items-end" style="gap: 0.75rem;">
+          <div>
+            <label class="form-label mb-1"><small>Message</small></label>
+            <input
+              type="text"
+              name="search"
+              value={@search}
+              placeholder="Search messages..."
+              class="form-control form-control-sm"
+              style="min-width: 240px;"
+            />
+          </div>
+          <div>
+            <label class="form-label mb-1"><small>Level</small></label>
+            <select name="level" class="form-select form-select-sm" style="min-width: 120px;">
+              <option value="" selected={@level == ""}>All</option>
+              <option :for={l <- @levels} value={l} selected={@level == l}>
+                {String.capitalize(l)}
+              </option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        </form>
+        <button phx-click="clear" class="btn btn-outline-secondary btn-sm">
           Clear
         </button>
-      </form>
+      </div>
 
       <div class="card">
         <div class="card-body p-0">
@@ -188,14 +190,6 @@ defmodule LogStreamDashboard.Components do
       <div class="col-sm-4 mb-3">
         <div class="card">
           <div class="card-body text-center">
-            <h6 class="card-subtitle text-muted mb-1">Total Blocks</h6>
-            <h4 class="mb-0">{@stats.total_blocks}</h4>
-          </div>
-        </div>
-      </div>
-      <div class="col-sm-4 mb-3">
-        <div class="card">
-          <div class="card-body text-center">
             <h6 class="card-subtitle text-muted mb-1">Total Entries</h6>
             <h4 class="mb-0">{@stats.total_entries}</h4>
           </div>
@@ -204,7 +198,7 @@ defmodule LogStreamDashboard.Components do
       <div class="col-sm-4 mb-3">
         <div class="card">
           <div class="card-body text-center">
-            <h6 class="card-subtitle text-muted mb-1">Compressed Size</h6>
+            <h6 class="card-subtitle text-muted mb-1">Total Size</h6>
             <h4 class="mb-0">{format_bytes(@stats.total_bytes)}</h4>
           </div>
         </div>
@@ -212,8 +206,54 @@ defmodule LogStreamDashboard.Components do
       <div class="col-sm-4 mb-3">
         <div class="card">
           <div class="card-body text-center">
-            <h6 class="card-subtitle text-muted mb-1">Index Size</h6>
-            <h4 class="mb-0">{format_bytes(@stats.index_size)}</h4>
+            <h6 class="card-subtitle text-muted mb-1">Storage Mode</h6>
+            <h4 class="mb-0">
+              <span class="badge bg-info">{LogStream.Config.storage()}</span>
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Raw Blocks</h6>
+            <h4 class="mb-0">
+              {@stats.raw_blocks}
+              <small class="text-muted" style="font-size: 0.6em;">
+                ({format_bytes(@stats.raw_bytes)})
+              </small>
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Compressed Blocks</h6>
+            <h4 class="mb-0">
+              {@stats.zstd_blocks}
+              <small class="text-muted" style="font-size: 0.6em;">
+                ({format_bytes(@stats.zstd_bytes)})
+              </small>
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Compression Ratio</h6>
+            <h4 class="mb-0">
+              {if @stats.zstd_entries > 0 and @stats.raw_entries > 0 do
+                raw_per = @stats.raw_bytes / @stats.raw_entries
+                zstd_per = @stats.zstd_bytes / @stats.zstd_entries
+                ratio = raw_per / zstd_per
+                pct = Float.round((1 - 1 / ratio) * 100, 1)
+                "#{Float.round(ratio, 1)}x (#{pct}%)"
+              else
+                if @stats.zstd_blocks > 0, do: "compressed", else: "pending"
+              end}
+            </h4>
           </div>
         </div>
       </div>
@@ -240,18 +280,8 @@ defmodule LogStreamDashboard.Components do
       <div class="col-sm-4 mb-3">
         <div class="card">
           <div class="card-body text-center">
-            <h6 class="card-subtitle text-muted mb-1">Storage Mode</h6>
-            <h4 class="mb-0">
-              <span class="badge bg-info">{LogStream.Config.storage()}</span>
-            </h4>
-          </div>
-        </div>
-      </div>
-      <div :if={@stats.disk_size > 0} class="col-sm-4 mb-3">
-        <div class="card">
-          <div class="card-body text-center">
-            <h6 class="card-subtitle text-muted mb-1">Disk Usage</h6>
-            <h4 class="mb-0">{format_bytes(@stats.disk_size)}</h4>
+            <h6 class="card-subtitle text-muted mb-1">Index Size</h6>
+            <h4 class="mb-0">{format_bytes(@stats.index_size)}</h4>
           </div>
         </div>
       </div>

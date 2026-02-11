@@ -29,27 +29,27 @@ defmodule LogStreamDashboard.Page do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :nav, Map.get(assigns.page.params, "nav", "search"))
+
     ~H"""
     <.live_nav_bar id="log-tabs" page={@page} extra_params={["search", "level", "p", "per_page"]}>
-      <:item name="search" label="Search">
-        <.search_tab
-          entries={@entries}
-          total={@total}
-          search={@search}
-          level={@level}
-          current_page={@current_page}
-          per_page={@per_page}
-          page={@page}
-          socket={@socket}
-        />
-      </:item>
-      <:item name="stats" label="Stats">
-        <.stats_tab stats={@stats} />
-      </:item>
-      <:item name="tail" label="Live Tail">
-        <.tail_tab entries={@tail_entries} subscribed={@subscribed} />
-      </:item>
+      <:item name="search" label="Search"><span></span></:item>
+      <:item name="stats" label="Stats"><span></span></:item>
+      <:item name="tail" label="Live Tail"><span></span></:item>
     </.live_nav_bar>
+    <.search_tab
+      :if={@nav == "search"}
+      entries={@entries}
+      total={@total}
+      search={@search}
+      level={@level}
+      current_page={@current_page}
+      per_page={@per_page}
+      page={@page}
+      socket={@socket}
+    />
+    <.stats_tab :if={@nav == "stats"} stats={@stats} />
+    <.tail_tab :if={@nav == "tail"} entries={@tail_entries} subscribed={@subscribed} />
     """
   end
 
