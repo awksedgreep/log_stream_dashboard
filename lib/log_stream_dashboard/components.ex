@@ -1,0 +1,351 @@
+defmodule LogStreamDashboard.Components do
+  @moduledoc false
+  use Phoenix.Component
+
+  # --- Search tab ---
+
+  attr(:entries, :list, required: true)
+  attr(:total, :integer, required: true)
+  attr(:search, :string, required: true)
+  attr(:level, :string, required: true)
+  attr(:current_page, :integer, required: true)
+  attr(:per_page, :integer, required: true)
+  attr(:page, :any, required: true)
+  attr(:socket, :any, required: true)
+
+  def search_tab(assigns) do
+    total_pages = max(1, ceil(assigns.total / assigns.per_page))
+    levels = ~w(debug info warning error)
+    assigns = assigns |> assign(:total_pages, total_pages) |> assign(:levels, levels)
+
+    ~H"""
+    <div class="mb-4">
+      <form phx-submit="search" class="d-flex align-items-end mb-3" style="gap: 0.75rem;">
+        <div>
+          <label class="form-label mb-1"><small>Message</small></label>
+          <input
+            type="text"
+            name="search"
+            value={@search}
+            placeholder="Search messages..."
+            class="form-control form-control-sm"
+            style="min-width: 240px;"
+          />
+        </div>
+        <div>
+          <label class="form-label mb-1"><small>Level</small></label>
+          <select name="level" class="form-select form-select-sm" style="min-width: 120px;">
+            <option value="" selected={@level == ""}>All</option>
+            <option :for={l <- @levels} value={l} selected={@level == l}>
+              {String.capitalize(l)}
+            </option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+        <button type="button" phx-click="clear" class="btn btn-outline-secondary btn-sm">
+          Clear
+        </button>
+      </form>
+
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="d-flex justify-content-between align-items-center px-3 py-2">
+            <small class="text-muted">
+              {@total} {if @total == 1, do: "entry", else: "entries"}
+            </small>
+            <small class="text-muted">
+              Page {@current_page} of {@total_pages}
+            </small>
+          </div>
+          <table class="table table-sm table-hover mb-0">
+            <thead>
+              <tr>
+                <th style="width: 180px;">Timestamp</th>
+                <th style="width: 80px;">Level</th>
+                <th>Message</th>
+                <th style="width: 200px;">Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :if={@entries == []}>
+                <td colspan="4" class="text-center text-muted py-4">No log entries found.</td>
+              </tr>
+              <.entry_row :for={entry <- @entries} entry={entry} />
+            </tbody>
+          </table>
+          <.pagination
+            :if={@total_pages > 1}
+            current_page={@current_page}
+            total_pages={@total_pages}
+            page={@page}
+            socket={@socket}
+            search={@search}
+            level={@level}
+            per_page={@per_page}
+          />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr(:entry, :any, required: true)
+
+  defp entry_row(assigns) do
+    ~H"""
+    <tr>
+      <td class="text-monospace" style="font-size: 0.8rem;">
+        {format_timestamp(@entry.timestamp)}
+      </td>
+      <td><.level_badge level={@entry.level} /></td>
+      <td style="max-width: 500px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        {@entry.message}
+      </td>
+      <td style="font-size: 0.8rem;">
+        {format_metadata(@entry.metadata)}
+      </td>
+    </tr>
+    """
+  end
+
+  attr(:level, :any, required: true)
+
+  defp level_badge(assigns) do
+    color =
+      case to_string(assigns.level) do
+        "error" -> "danger"
+        "warning" -> "warning"
+        "info" -> "info"
+        "debug" -> "secondary"
+        _ -> "light"
+      end
+
+    assigns = assign(assigns, :color, color)
+
+    ~H"""
+    <span class={"badge bg-#{@color}"} style="font-size: 0.7rem;">
+      {@level}
+    </span>
+    """
+  end
+
+  attr(:current_page, :integer, required: true)
+  attr(:total_pages, :integer, required: true)
+  attr(:page, :any, required: true)
+  attr(:socket, :any, required: true)
+  attr(:search, :string, required: true)
+  attr(:level, :string, required: true)
+  attr(:per_page, :integer, required: true)
+
+  defp pagination(assigns) do
+    ~H"""
+    <nav class="d-flex justify-content-center py-2">
+      <ul class="pagination pagination-sm mb-0">
+        <li class={"page-item #{if @current_page <= 1, do: "disabled"}"}>
+          <.link
+            patch={page_path(@socket, @page, @current_page - 1, @search, @level, @per_page)}
+            class="page-link"
+          >
+            Prev
+          </.link>
+        </li>
+        <li class="page-item disabled">
+          <span class="page-link">{@current_page} / {@total_pages}</span>
+        </li>
+        <li class={"page-item #{if @current_page >= @total_pages, do: "disabled"}"}>
+          <.link
+            patch={page_path(@socket, @page, @current_page + 1, @search, @level, @per_page)}
+            class="page-link"
+          >
+            Next
+          </.link>
+        </li>
+      </ul>
+    </nav>
+    """
+  end
+
+  defp page_path(socket, page, page_num, search, level, per_page) do
+    Phoenix.LiveDashboard.PageBuilder.live_dashboard_path(socket, page, %{
+      "nav" => "search",
+      "search" => search,
+      "level" => level,
+      "page" => to_string(page_num),
+      "per_page" => to_string(per_page)
+    })
+  end
+
+  # --- Stats tab ---
+
+  attr(:stats, :any, required: true)
+
+  def stats_tab(assigns) do
+    ~H"""
+    <div :if={@stats == nil} class="text-center text-muted py-4">
+      Loading stats...
+    </div>
+    <div :if={@stats} class="row">
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Total Blocks</h6>
+            <h4 class="mb-0">{@stats.total_blocks}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Total Entries</h6>
+            <h4 class="mb-0">{@stats.total_entries}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Compressed Size</h6>
+            <h4 class="mb-0">{format_bytes(@stats.total_bytes)}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Index Size</h6>
+            <h4 class="mb-0">{format_bytes(@stats.index_size)}</h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Oldest Entry</h6>
+            <h4 class="mb-0" style="font-size: 1rem;">
+              {format_timestamp(@stats.oldest_timestamp)}
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Newest Entry</h6>
+            <h4 class="mb-0" style="font-size: 1rem;">
+              {format_timestamp(@stats.newest_timestamp)}
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Storage Mode</h6>
+            <h4 class="mb-0">
+              <span class="badge bg-info">{LogStream.Config.storage()}</span>
+            </h4>
+          </div>
+        </div>
+      </div>
+      <div :if={@stats.disk_size > 0} class="col-sm-4 mb-3">
+        <div class="card">
+          <div class="card-body text-center">
+            <h6 class="card-subtitle text-muted mb-1">Disk Usage</h6>
+            <h4 class="mb-0">{format_bytes(@stats.disk_size)}</h4>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # --- Live Tail tab ---
+
+  attr(:entries, :list, required: true)
+  attr(:subscribed, :boolean, required: true)
+
+  def tail_tab(assigns) do
+    ~H"""
+    <div class="mb-4">
+      <div class="d-flex align-items-center mb-3" style="gap: 0.75rem;">
+        <button
+          phx-click="toggle_tail"
+          class={"btn btn-sm #{if @subscribed, do: "btn-danger", else: "btn-success"}"}
+        >
+          {if @subscribed, do: "Stop", else: "Start"}
+        </button>
+        <small class="text-muted">
+          <%= if @subscribed do %>
+            Streaming... ({length(@entries)} entries)
+          <% else %>
+            Paused
+          <% end %>
+        </small>
+      </div>
+
+      <div class="card">
+        <div class="card-body p-0">
+          <table class="table table-sm table-hover mb-0">
+            <thead>
+              <tr>
+                <th style="width: 180px;">Timestamp</th>
+                <th style="width: 80px;">Level</th>
+                <th>Message</th>
+                <th style="width: 200px;">Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :if={@entries == []}>
+                <td colspan="4" class="text-center text-muted py-4">
+                  {if @subscribed,
+                    do: "Waiting for log entries...",
+                    else: "Click Start to begin streaming."}
+                </td>
+              </tr>
+              <.entry_row :for={entry <- @entries} entry={entry} />
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  # --- Helpers ---
+
+  defp format_timestamp(nil), do: "-"
+
+  defp format_timestamp(ts) when is_integer(ts) do
+    case DateTime.from_unix(ts) do
+      {:ok, dt} -> Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S")
+      _ -> to_string(ts)
+    end
+  end
+
+  defp format_timestamp(%DateTime{} = dt) do
+    Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S")
+  end
+
+  defp format_timestamp(other), do: to_string(other)
+
+  defp format_metadata(nil), do: ""
+  defp format_metadata(meta) when meta == %{}, do: ""
+
+  defp format_metadata(meta) when is_map(meta) do
+    meta
+    |> Enum.reject(fn {_k, v} -> v == "" or is_nil(v) end)
+    |> Enum.map_join(", ", fn {k, v} -> "#{k}=#{v}" end)
+  end
+
+  defp format_bytes(nil), do: "-"
+  defp format_bytes(0), do: "0 B"
+
+  defp format_bytes(bytes) when is_integer(bytes) do
+    cond do
+      bytes >= 1_073_741_824 -> "#{Float.round(bytes / 1_073_741_824, 1)} GB"
+      bytes >= 1_048_576 -> "#{Float.round(bytes / 1_048_576, 1)} MB"
+      bytes >= 1024 -> "#{Float.round(bytes / 1024, 1)} KB"
+      true -> "#{bytes} B"
+    end
+  end
+end

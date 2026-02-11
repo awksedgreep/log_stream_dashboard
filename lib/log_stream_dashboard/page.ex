@@ -1,0 +1,161 @@
+defmodule LogStreamDashboard.Page do
+  @moduledoc false
+  use Phoenix.LiveDashboard.PageBuilder, refresher?: false
+
+  import LogStreamDashboard.Components
+
+  @tail_cap 200
+
+  @impl true
+  def menu_link(_, _) do
+    {:ok, "Logs"}
+  end
+
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok,
+     assign(socket,
+       entries: [],
+       total: 0,
+       stats: nil,
+       tail_entries: [],
+       subscribed: false,
+       search: "",
+       level: "",
+       per_page: 25,
+       current_page: 1
+     )}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <.live_nav_bar id="log-tabs" page={@page} extra_params={["search", "level", "page", "per_page"]}>
+      <:item name="search" label="Search">
+        <.search_tab
+          entries={@entries}
+          total={@total}
+          search={@search}
+          level={@level}
+          current_page={@current_page}
+          per_page={@per_page}
+          page={@page}
+          socket={@socket}
+        />
+      </:item>
+      <:item name="stats" label="Stats">
+        <.stats_tab stats={@stats} />
+      </:item>
+      <:item name="tail" label="Live Tail">
+        <.tail_tab entries={@tail_entries} subscribed={@subscribed} />
+      </:item>
+    </.live_nav_bar>
+    """
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    nav = Map.get(params, "nav", "search")
+    socket = apply_nav(nav, params, socket)
+    {:noreply, socket}
+  end
+
+  defp apply_nav("search", params, socket) do
+    search = Map.get(params, "search", "")
+    level = Map.get(params, "level", "")
+    per_page = params |> Map.get("per_page", "25") |> String.to_integer() |> max(1) |> min(100)
+    current_page = params |> Map.get("page", "1") |> String.to_integer() |> max(1)
+    offset = (current_page - 1) * per_page
+
+    filters = build_filters(search, level)
+    query_opts = filters ++ [limit: per_page, offset: offset, order: :desc]
+
+    case LogStream.query(query_opts) do
+      {:ok, %LogStream.Result{entries: entries, total: total}} ->
+        assign(socket,
+          entries: entries,
+          total: total,
+          search: search,
+          level: level,
+          per_page: per_page,
+          current_page: current_page
+        )
+
+      {:error, _} ->
+        assign(socket,
+          entries: [],
+          total: 0,
+          search: search,
+          level: level,
+          per_page: per_page,
+          current_page: current_page
+        )
+    end
+  end
+
+  defp apply_nav("stats", _params, socket) do
+    case LogStream.stats() do
+      {:ok, stats} -> assign(socket, :stats, stats)
+      _ -> socket
+    end
+  end
+
+  defp apply_nav("tail", _params, socket) do
+    if connected?(socket) and not socket.assigns.subscribed do
+      LogStream.subscribe()
+      assign(socket, subscribed: true, tail_entries: [])
+    else
+      socket
+    end
+  end
+
+  defp apply_nav(_, _params, socket), do: socket
+
+  defp build_filters(search, level) do
+    filters = []
+    filters = if search != "", do: [{:message, search} | filters], else: filters
+
+    filters =
+      if level != "", do: [{:level, String.to_existing_atom(level)} | filters], else: filters
+
+    filters
+  end
+
+  @impl true
+  def handle_event("search", %{"search" => search, "level" => level}, socket) do
+    params = %{
+      "nav" => "search",
+      "search" => search,
+      "level" => level,
+      "page" => "1",
+      "per_page" => to_string(socket.assigns.per_page)
+    }
+
+    to = live_dashboard_path(socket, socket.assigns.page, params)
+    {:noreply, push_patch(socket, to: to)}
+  end
+
+  def handle_event("clear", _, socket) do
+    params = %{"nav" => "search", "search" => "", "level" => "", "page" => "1"}
+    to = live_dashboard_path(socket, socket.assigns.page, params)
+    {:noreply, push_patch(socket, to: to)}
+  end
+
+  def handle_event("toggle_tail", _, socket) do
+    if socket.assigns.subscribed do
+      LogStream.unsubscribe()
+      {:noreply, assign(socket, subscribed: false)}
+    else
+      LogStream.subscribe()
+      {:noreply, assign(socket, subscribed: true, tail_entries: [])}
+    end
+  end
+
+  @impl true
+  def handle_info({:log_stream, :entry, entry}, socket) do
+    tail = [entry | socket.assigns.tail_entries] |> Enum.take(@tail_cap)
+    {:noreply, assign(socket, :tail_entries, tail)}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
+end
