@@ -1,0 +1,121 @@
+# Minimal Phoenix app to demo LogStreamDashboard.
+#
+# Run:  mix run examples/demo.exs
+# Open: http://localhost:4040/dashboard/logs
+# Stop: Ctrl+C twice
+
+Logger.configure(level: :info)
+
+# --- Phoenix Endpoint + Router ---
+
+defmodule Demo.Router do
+  use Phoenix.Router
+  import Phoenix.LiveDashboard.Router
+
+  pipeline :browser do
+    plug :fetch_session
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
+  scope "/" do
+    pipe_through :browser
+
+    live_dashboard "/dashboard",
+      additional_pages: [
+        logs: LogStreamDashboard.Page
+      ]
+  end
+end
+
+defmodule Demo.Endpoint do
+  use Phoenix.Endpoint, otp_app: :log_stream_dashboard
+
+  @session_options [
+    store: :cookie,
+    key: "_demo_key",
+    signing_salt: "demo_salt",
+    same_site: "Lax"
+  ]
+
+  socket "/live", Phoenix.LiveView.Socket,
+    websocket: [connect_info: [session: @session_options]]
+
+  plug Plug.Session, @session_options
+  plug Demo.Router
+end
+
+# --- Boot everything ---
+
+# Configure endpoint
+Application.put_env(:log_stream_dashboard, Demo.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
+  http: [port: 4040],
+  url: [host: "localhost"],
+  secret_key_base: String.duplicate("a", 64),
+  live_view: [signing_salt: "demo_lv_salt"],
+  pubsub_server: Demo.PubSub,
+  server: true
+)
+
+# Use in-memory storage so no files are created
+Application.put_env(:log_stream, :storage, :memory)
+Application.put_env(:log_stream, :flush_interval, 2_000)
+Application.put_env(:log_stream, :max_buffer_size, 100)
+
+# Start deps
+{:ok, _} = Application.ensure_all_started(:phoenix_live_dashboard)
+
+# Start PubSub (required by LiveView)
+{:ok, _} =
+  Supervisor.start_link(
+    [{Phoenix.PubSub, name: Demo.PubSub}],
+    strategy: :one_for_one
+  )
+
+# Start LogStream (index + buffer + retention)
+{:ok, _} = Application.ensure_all_started(:log_stream)
+
+# Start endpoint
+{:ok, _} = Demo.Endpoint.start_link()
+
+IO.puts("""
+
+========================================
+  LogStreamDashboard Demo
+  http://localhost:4040/dashboard/logs
+========================================
+
+Generating sample log entries every 2 seconds...
+Press Ctrl+C twice to stop.
+""")
+
+# Generate sample log data in a loop
+require Logger
+
+sample_messages = [
+  {"User logged in", :info, %{user_id: "123", service: "auth"}},
+  {"Database query completed", :debug, %{duration_ms: "42", table: "users"}},
+  {"Request timeout", :warning, %{endpoint: "/api/search", timeout_ms: "5000"}},
+  {"Connection refused", :error, %{host: "db-replica-2", port: "5432"}},
+  {"Cache hit", :info, %{cache: "redis", key: "session:abc"}},
+  {"Payment processed", :info, %{amount: "$29.99", provider: "stripe"}},
+  {"Rate limit exceeded", :warning, %{ip: "192.168.1.100", limit: "100/min"}},
+  {"SSL certificate expiring soon", :warning, %{domain: "api.example.com", days: "7"}},
+  {"Worker completed job", :info, %{job_id: "j-9001", queue: "default"}},
+  {"Unhandled exception in controller", :error, %{module: "UserController", action: "show"}}
+]
+
+Stream.interval(2_000)
+|> Stream.each(fn _ ->
+  # Pick 2-4 random messages per tick
+  count = Enum.random(2..4)
+
+  for _ <- 1..count do
+    {msg, level, meta} = Enum.random(sample_messages)
+    Logger.log(level, msg, Map.to_list(meta))
+  end
+
+  LogStream.flush()
+end)
+|> Stream.run()

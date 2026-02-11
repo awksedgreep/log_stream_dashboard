@@ -2,6 +2,7 @@ defmodule LogStreamDashboardTest do
   use ExUnit.Case
 
   test "page module implements PageBuilder callbacks" do
+    Code.ensure_loaded!(LogStreamDashboard.Page)
     assert function_exported?(LogStreamDashboard.Page, :menu_link, 2)
     assert function_exported?(LogStreamDashboard.Page, :render, 1)
     assert function_exported?(LogStreamDashboard.Page, :mount, 3)
