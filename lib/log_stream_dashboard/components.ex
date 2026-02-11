@@ -167,11 +167,11 @@ defmodule LogStreamDashboard.Components do
 
   defp page_path(socket, page, page_num, search, level, per_page) do
     Phoenix.LiveDashboard.PageBuilder.live_dashboard_path(socket, page, %{
-      "nav" => "search",
-      "search" => search,
-      "level" => level,
-      "page" => to_string(page_num),
-      "per_page" => to_string(per_page)
+      nav: "search",
+      search: search,
+      level: level,
+      p: to_string(page_num),
+      per_page: to_string(per_page)
     })
   end
 

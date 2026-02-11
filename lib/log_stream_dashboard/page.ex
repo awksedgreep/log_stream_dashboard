@@ -30,7 +30,7 @@ defmodule LogStreamDashboard.Page do
   @impl true
   def render(assigns) do
     ~H"""
-    <.live_nav_bar id="log-tabs" page={@page} extra_params={["search", "level", "page", "per_page"]}>
+    <.live_nav_bar id="log-tabs" page={@page} extra_params={["search", "level", "p", "per_page"]}>
       <:item name="search" label="Search">
         <.search_tab
           entries={@entries}
@@ -64,7 +64,7 @@ defmodule LogStreamDashboard.Page do
     search = Map.get(params, "search", "")
     level = Map.get(params, "level", "")
     per_page = params |> Map.get("per_page", "25") |> String.to_integer() |> max(1) |> min(100)
-    current_page = params |> Map.get("page", "1") |> String.to_integer() |> max(1)
+    current_page = params |> Map.get("p", "1") |> String.to_integer() |> max(1)
     offset = (current_page - 1) * per_page
 
     filters = build_filters(search, level)
@@ -124,11 +124,11 @@ defmodule LogStreamDashboard.Page do
   @impl true
   def handle_event("search", %{"search" => search, "level" => level}, socket) do
     params = %{
-      "nav" => "search",
-      "search" => search,
-      "level" => level,
-      "page" => "1",
-      "per_page" => to_string(socket.assigns.per_page)
+      nav: "search",
+      search: search,
+      level: level,
+      p: "1",
+      per_page: to_string(socket.assigns.per_page)
     }
 
     to = live_dashboard_path(socket, socket.assigns.page, params)
@@ -136,7 +136,7 @@ defmodule LogStreamDashboard.Page do
   end
 
   def handle_event("clear", _, socket) do
-    params = %{"nav" => "search", "search" => "", "level" => "", "page" => "1"}
+    params = %{nav: "search", search: "", level: "", p: "1"}
     to = live_dashboard_path(socket, socket.assigns.page, params)
     {:noreply, push_patch(socket, to: to)}
   end

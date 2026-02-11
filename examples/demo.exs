@@ -8,6 +8,10 @@ Logger.configure(level: :info)
 
 # --- Phoenix Endpoint + Router ---
 
+defmodule Demo.ErrorHTML do
+  def render(template, _assigns), do: "Error: #{template}"
+end
+
 defmodule Demo.Router do
   use Phoenix.Router
   import Phoenix.LiveDashboard.Router
@@ -55,10 +59,14 @@ Application.put_env(:log_stream_dashboard, Demo.Endpoint,
   secret_key_base: String.duplicate("a", 64),
   live_view: [signing_salt: "demo_lv_salt"],
   pubsub_server: Demo.PubSub,
+  render_errors: [formats: [html: Demo.ErrorHTML], layout: false],
+  debug_errors: true,
   server: true
 )
 
-# Use in-memory storage so no files are created
+# Stop log_stream (auto-started by mix run with disk defaults),
+# reconfigure for in-memory mode, then restart
+Application.stop(:log_stream)
 Application.put_env(:log_stream, :storage, :memory)
 Application.put_env(:log_stream, :flush_interval, 2_000)
 Application.put_env(:log_stream, :max_buffer_size, 100)
@@ -73,7 +81,7 @@ Application.put_env(:log_stream, :max_buffer_size, 100)
     strategy: :one_for_one
   )
 
-# Start LogStream (index + buffer + retention)
+# Restart LogStream with memory config
 {:ok, _} = Application.ensure_all_started(:log_stream)
 
 # Start endpoint
