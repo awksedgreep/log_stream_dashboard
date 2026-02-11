@@ -51,6 +51,9 @@ end
 
 # --- Boot everything ---
 
+# Phoenix needs a JSON library
+Application.put_env(:phoenix, :json_library, Jason)
+
 # Configure endpoint
 Application.put_env(:log_stream_dashboard, Demo.Endpoint,
   adapter: Bandit.PhoenixAdapter,

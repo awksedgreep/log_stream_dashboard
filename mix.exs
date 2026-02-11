@@ -30,6 +30,7 @@ defmodule LogStreamDashboard.MixProject do
       {:log_stream, path: "../log_stream"},
       {:phoenix_live_dashboard, "~> 0.8"},
       {:phoenix_live_view, "~> 1.0"},
+      {:jason, "~> 1.4", only: :dev},
       {:bandit, "~> 1.5", only: :dev},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
