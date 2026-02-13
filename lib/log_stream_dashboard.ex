@@ -1,6 +1,6 @@
 defmodule LogStreamDashboard do
   @moduledoc """
-  Phoenix LiveDashboard page for browsing LogStream logs.
+  Phoenix LiveDashboard page for browsing TimelessLogs logs.
 
   ## Setup
 

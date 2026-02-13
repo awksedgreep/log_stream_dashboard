@@ -11,7 +11,7 @@ defmodule LogStreamDashboard.MixProject do
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      description: "Phoenix LiveDashboard page for LogStream log viewer.",
+      description: "Phoenix LiveDashboard page for TimelessLogs log viewer.",
       source_url: @source_url,
       homepage_url: @source_url,
       package: package(),
@@ -27,11 +27,11 @@ defmodule LogStreamDashboard.MixProject do
 
   defp deps do
     [
-      {:log_stream, path: "../log_stream"},
+      {:timeless_logs, path: "../timeless_logs"},
       {:phoenix_live_dashboard, "~> 0.8"},
       {:phoenix_live_view, "~> 1.0"},
-      {:jason, "~> 1.4", only: :dev},
-      {:bandit, "~> 1.5", only: :dev},
+      {:jason, "~> 1.4"},
+      {:bandit, "~> 1.6"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end

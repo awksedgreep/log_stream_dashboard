@@ -208,7 +208,7 @@ defmodule LogStreamDashboard.Components do
           <div class="card-body text-center">
             <h6 class="card-subtitle text-muted mb-1">Storage Mode</h6>
             <h4 class="mb-0">
-              <span class="badge bg-info">{LogStream.Config.storage()}</span>
+              <span class="badge bg-info">{TimelessLogs.Config.storage()}</span>
             </h4>
           </div>
         </div>

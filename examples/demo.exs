@@ -69,13 +69,13 @@ Application.put_env(:log_stream_dashboard, Demo.Endpoint,
 
 # Stop log_stream (auto-started by mix run with disk defaults),
 # reconfigure for in-memory mode, then restart
-Application.stop(:log_stream)
-Application.put_env(:log_stream, :storage, :memory)
-Application.put_env(:log_stream, :flush_interval, 5_000)
-Application.put_env(:log_stream, :max_buffer_size, 500)
-Application.put_env(:log_stream, :compaction_interval, 10_000)
-Application.put_env(:log_stream, :compaction_threshold, 500)
-Application.put_env(:log_stream, :compaction_max_raw_age, 30)
+Application.stop(:timeless_logs)
+Application.put_env(:timeless_logs, :storage, :memory)
+Application.put_env(:timeless_logs, :flush_interval, 5_000)
+Application.put_env(:timeless_logs, :max_buffer_size, 500)
+Application.put_env(:timeless_logs, :compaction_interval, 10_000)
+Application.put_env(:timeless_logs, :compaction_threshold, 500)
+Application.put_env(:timeless_logs, :compaction_max_raw_age, 30)
 
 # Start deps
 {:ok, _} = Application.ensure_all_started(:phoenix_live_dashboard)
@@ -87,8 +87,8 @@ Application.put_env(:log_stream, :compaction_max_raw_age, 30)
     strategy: :one_for_one
   )
 
-# Restart LogStream with memory config
-{:ok, _} = Application.ensure_all_started(:log_stream)
+# Restart TimelessLogs with memory config
+{:ok, _} = Application.ensure_all_started(:timeless_logs)
 
 # Start endpoint
 {:ok, _} = Demo.Endpoint.start_link()

@@ -70,8 +70,8 @@ defmodule LogStreamDashboard.Page do
     filters = build_filters(search, level)
     query_opts = filters ++ [limit: per_page, offset: offset, order: :desc]
 
-    case LogStream.query(query_opts) do
-      {:ok, %LogStream.Result{entries: entries, total: total}} ->
+    case TimelessLogs.query(query_opts) do
+      {:ok, %TimelessLogs.Result{entries: entries, total: total}} ->
         assign(socket,
           entries: entries,
           total: total,
@@ -94,7 +94,7 @@ defmodule LogStreamDashboard.Page do
   end
 
   defp apply_nav("stats", _params, socket) do
-    case LogStream.stats() do
+    case TimelessLogs.stats() do
       {:ok, stats} -> assign(socket, :stats, stats)
       _ -> socket
     end
@@ -102,7 +102,7 @@ defmodule LogStreamDashboard.Page do
 
   defp apply_nav("tail", _params, socket) do
     if connected?(socket) and not socket.assigns.subscribed do
-      LogStream.subscribe()
+      TimelessLogs.subscribe()
       assign(socket, subscribed: true, tail_entries: [])
     else
       socket
@@ -143,16 +143,16 @@ defmodule LogStreamDashboard.Page do
 
   def handle_event("toggle_tail", _, socket) do
     if socket.assigns.subscribed do
-      LogStream.unsubscribe()
+      TimelessLogs.unsubscribe()
       {:noreply, assign(socket, subscribed: false)}
     else
-      LogStream.subscribe()
+      TimelessLogs.subscribe()
       {:noreply, assign(socket, subscribed: true, tail_entries: [])}
     end
   end
 
   @impl true
-  def handle_info({:log_stream, :entry, entry}, socket) do
+  def handle_info({:timeless_logs, :entry, entry}, socket) do
     tail = [entry | socket.assigns.tail_entries] |> Enum.take(@tail_cap)
     {:noreply, assign(socket, :tail_entries, tail)}
   end
